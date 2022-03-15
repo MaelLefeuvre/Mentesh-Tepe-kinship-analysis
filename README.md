@@ -1,5 +1,5 @@
 #### Summary
-**Date of analysis:** 2022-03-15
+**Date of analysis:** 2022-03-15  
 **Aim:** Re-run READ Kinship analysis with MT-EAGER bam files WITHOUT running manual PMD damage trimming and interlacing, as in ([Skourtanioti,2019](https://doi.org/10.1016/j.cell.2020.04.044)).
 
 #### Data 
