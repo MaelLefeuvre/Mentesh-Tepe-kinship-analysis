@@ -1,0 +1,8 @@
+in/
+methods/
+results/
+#Ignore everything in ./out ...
+out/
+
+# ...Except for 2-dedup symlink
+!out/2-dedup

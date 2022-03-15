@@ -1,0 +1,109 @@
+#!/bin/bash
+
+THREADS=`nproc`
+
+DATADIR="`pwd`/data"    # This is where fastq/bam and reference files should be located.
+OUTPUTDIR="`pwd`/out"
+
+#RUNS=$(find data/out2/ | grep -Eo "202[0,1]_run[0-9]" | sort -u)
+SAMPLES=$(find out/2-dedup/ | grep -Eo "MT[0-9]{1,2}|SK27300" | sort -u)
+
+
+REFERENCE="data/reference/hs37d5/hs37d5.fa"
+TARGET_SNPS="./data/target_positions/1240K/v44.3_1240K_public.snp"
+
+
+MIN_MQ=30  # Min mapping quality: -q 
+MIN_BQ=30  # Min base    quality: -Q
+
+BAM_UTILS="`pwd`/dependencies/bamUtil/bam"
+
+
+# Conda initialization
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Run mapDamage
+conda activate mapdamage-2.2.1
+for sample in ${SAMPLES}; do
+
+    DEDUP_BAM="$(basename ${OUTPUTDIR})/2-dedup/${sample}/${sample}.fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.merged_rmdup.bam"
+    MAP_DAMAGE_DIR="$(basename ${OUTPUTDIR})/3-mapdamage/${sample}"
+    if [ ! -f "${MAP_DAMAGE_DIR}/Runtime_log.txt" ]; then
+        echo "Running mapDamage on ${sample}:"
+
+        mkdir -p ${MAP_DAMAGE_DIR}
+        echo "- [SAMPLE]: ${DEDUP_BAM}"
+        MAP_DAMAGE_COMMAND="mapDamage -i ${DEDUP_BAM} -r ${REFERENCE} -d ${MAP_DAMAGE_DIR} --rescale"
+        echo "- [COMMAND]: ${MAP_DAMAGE_COMMAND}"
+        exec ${MAP_DAMAGE_COMMAND} &
+    fi
+done
+wait
+conda deactivate
+
+# Generate pileup file from rescaled bams with samtools
+conda activate samtools-1.15
+OUTPUT_PILEUP="out/4-pileup/AllMT_RBq${MIN_MQ}Q${MIN_BQ}_1240k.mpileup"
+if [ ! -f ${OUTPUT_PILEUP} ]; then
+    echo "Running samtools mpileup on samples"
+    mkdir -p out/4-pileup
+    RESCALED_BAMS=($(find out/3-mapdamage/ | grep ".fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.merged_rmdup.rescaled.bam"|sort -u))
+    for sample in "${RESCALED_BAMS[@]}"; do
+        echo "- [INPUT]: ${sample}"
+    done
+    
+    echo "- [OUTPUT]: ${OUTPUT_PILEUP}"
+    
+    PILEUP_CMD="samtools mpileup -RB -q${MIN_MQ} -Q${MIN_BQ} -l <(cat ${TARGET_SNPS} |awk '{print \$2,\$4}') ${RESCALED_BAMS[@]} > ${OUTPUT_PILEUP}"
+    
+    echo -e "\n- [COMMAND]: ${PILEUP_CMD}"
+    eval $PILEUP_CMD
+fi 
+conda deactivate
+
+conda activate sequencetools-1.5.2
+# Variant calling using pileupCaller
+OUTPUT_SNP="out/5-pileupCaller/AllMT_pileupCaller_RBq${MIN_MQ}Q${MIN_BQ}.snp"
+if [ ! -f ${OUTPUT_SNP} ]; then
+    echo "Variant calling using PileupCaller"
+    mkdir -p "out/5-pileupCaller"
+    PILEUP_CMD="pileupCaller --randomHaploid --sampleNames ${SAMPLES//$'\n'/,} --samplePopName MTT -f ${TARGET_SNPS} -e ${OUTPUT_SNP%.snp} < ${OUTPUT_PILEUP}"
+
+    echo "- [INPUT]  : ${OUTPUT_PILEUP}"
+    echo "- [OUTPUT] : ${OUTPUT_SNP}"
+    echo "- [COMMAND]: ${PILEUP_CMD}"
+
+    eval $PILEUP_CMD
+fi
+conda deactivate
+
+
+# Convert to plink format.
+conda activate eigensoft-7.2.1
+OUTPUT_PED="${OUTPUT_SNP%.snp}.ped"
+if [ ! -f "${OUTPUT_PED}" ]; then
+    echo "Converting to PED/MAP Plink format"
+
+    WORK_DIR=$(dirname $OUTPUT_SNP)
+    BASENAME=$(basename ${OUTPUT_SNP%.snp})
+    CONVERTF_FILE="par.EIGENSTRAT.PED"
+
+    pushd ${WORK_DIR}
+    echo "" > $CONVERTF_FILE
+    echo "genotypename:           ${BASENAME}.geno"   >> ${CONVERTF_FILE}
+    echo "snpname:                ${BASENAME}.snp"    >> ${CONVERTF_FILE}
+    echo "indivname:              ${BASENAME}.ind"    >> ${CONVERTF_FILE}
+    echo "outputformat:           PED"                >> ${CONVERTF_FILE}
+    echo "genotypeoutname:        ${BASENAME}.ped"    >> ${CONVERTF_FILE}
+    echo "snpoutname:             ${BASENAME}.map"    >> ${CONVERTF_FILE}
+    echo "indivoutname:           ${BASENAME}.pedind" >> ${CONVERTF_FILE}
+
+    cat ${CONVERTF_FILE}
+
+    CONVERTF_CMD="convertf -p ${CONVERTF_FILE}"
+    echo -e "\n- [COMMAND]: ${CONVERTF_CMD}"
+    eval $CONVERTF_CMD
+fi
+
+echo "Done!"
+
