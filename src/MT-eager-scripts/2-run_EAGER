@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# From: https://eager.readthedocs.io/en/latest/contents/installation.html#running-the-gui
+
+DATADIR="`pwd`/data" # This is where fastq/bam and reference files should be located.
+
+EAGER_IMG="./dependencies/EAGER-GUI_latest.sif" # This is the pulled singularity image
+
+singularity exec -B "${DATADIR}:/data" ${EAGER_IMG} eager

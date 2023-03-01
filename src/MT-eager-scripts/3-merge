@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# ---- **Old** merging protocol, attempting to apply transition filtration through selective soft-masking (using trimBam) & interlacing. 
+#      This approach does not play well with our non UDG-treated data.
+
+DATADIR="`pwd`/data" # This is where fastq/bam and reference files should be located.
+OUTPUTDIR="`pwd`/out"
+EAGER_IMG="./dependencies/EAGER-GUI_latest.sif" # This is the pulled singularity image
+
+RUNS=$(find data/out2/ | grep -Eo "202[0,1]_run[0-9]" | sort -u)
+SAMPLES=$(find data/out2/ | grep -Eo "MT[0-9]{1,2}|SK27300" | sort -u)
+
+
+REFERENCE="data/reference/hs37d5/hs37d5.fa"
+TARGET_SNPS="./data/target_positions/1240K/v44.3_1240K_public.snp"
+MASKING_TRESHOLD=0.01 # This is the treshold for MapDamage's Nick frequency probability 
+                      # at which we should stop applying masking.
+
+MIN_MQ=30
+MIN_BQ=30
+
+BAM_UTILS="`pwd`/dependencies/bamUtil/bam"
+
+
+for sample in ${SAMPLES}; do
+    echo "Merging ${sample}"
+    bams_to_merge=()
+    for run in ${RUNS}; do
+        bams=("$(find data/out2/${run}/${sample}*/5-DeDup -name "*.fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.bam")") \
+        && bams_to_merge+=("/${bams}") \
+        && echo -e "\tFound: ${bams}"
+    done
+        #for bam in "${bams_to_merge[@]}"; do
+            #COMMAND=${COMMAND} ${bam}
+        #done
+
+
+
+    # Merge files across runs
+    MERGED_BAM="$(basename ${OUTPUTDIR})/1-merge/${sample}/${sample}.fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.merged.bam"
+    mkdir -p $(dirname ${MERGED_BAM})
+    READGROUP="@RG\tID:ILLUMINA-${sample}_R1.fastq\tSM:${sample}_R1.fastq\tPL:illumina"
+    OPTARGS="-@12 -r${READGROUP}"
+    MERGE_COMMAND="samtools merge ${OPTARGS} /${MERGED_BAM} ${bams_to_merge[@]}"
+
+    echo ${MERGE_COMMAND}
+    echo -e "\n\nRunning: $MERGE_COMMAND\n\n\tUsing singularity image ${EAGER_IMG}\n"
+    singularity exec -B "${DATADIR}:/$(basename ${DATADIR})","${OUTPUTDIR}:/$(basename ${OUTPUTDIR})" ${EAGER_IMG} ${MERGE_COMMAND}
+
+    # Rerun deduplication
+    DEDUP_BAM="$(basename ${OUTPUTDIR})/2-dedup/${sample}/${sample}.fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.merged_rmdup.bam"
+    if [ ! -f ${DEDUP_BAM} ]; then
+        mkdir -p $(dirname ${DEDUP_BAM})
+        DEDUP_COMMAND="dedup -i /${MERGED_BAM} -m -o /$(dirname ${DEDUP_BAM})"
+        echo -e "\n\nRunning ${DEDUP_COMMAND}\n\n\tUsing singularity image ${EAGER_IMG}\n"
+        singularity exec -B "${DATADIR}:/$(basename ${DATADIR})","${OUTPUTDIR}:/$(basename ${OUTPUTDIR})" ${EAGER_IMG} ${DEDUP_COMMAND}
+    fi
+    # Rerun mapDamage
+    MAP_DAMAGE_DIR="$(basename ${OUTPUTDIR})/3-mapdamage/${sample}"
+    if [ ! -f "${MAP_DAMAGE_DIR}/Runtime_log.txt" ]; then
+        mkdir -p ${MAP_DAMAGE_DIR}
+        MAP_DAMAGE_COMMAND="mapDamage -i /${DEDUP_BAM} -r /${REFERENCE} -l 100 -d /${MAP_DAMAGE_DIR} --merge-reference-sequences -m 50"
+        echo -e "\n\nRunning ${MAP_DAMAGE_COMMAND}\n\n\tUsing singularity image ${EAGER_IMG}\n"
+        singularity exec -B "${DATADIR}:/$(basename ${DATADIR})","${OUTPUTDIR}:/$(basename ${OUTPUTDIR})" ${EAGER_IMG} ${MAP_DAMAGE_COMMAND}
+    fi
+
+    # Get p(3pG>A) < 1%
+    AWK_CMD="\$2<${MASKING_TRESHOLD}{print \$1; skip=1; exit 0 }END{if (!skip){print NR-1}}"
+    LEFT_MASK=$(awk "${AWK_CMD}" "${MAP_DAMAGE_DIR}/5pCtoT_freq.txt")
+    RIGHT_MASK=$(awk "${AWK_CMD}" "${MAP_DAMAGE_DIR}/3pGtoA_freq.txt")
+    echo -e "Mask Position for ${sample} p(PMD) < 1%"
+    echo -e "\t- Left (5pCtoT): ${LEFT_MASK}"
+    echo -e "\t- Right (3pGtoA): ${RIGHT_MASK}"
+
+    # Mask
+    MASKED_BAM="out/4-trimBam/${sample}/${sample}.fastq.combined.fq.prefixed.mapped.Mappedonly.sorted.cleaned.merged_rmdup.masked.bam"
+    if [ ! -f ${MASKED_BAM} ]; then
+        mkdir -p $(dirname ${MASKED_BAM})
+        ${BAM_UTILS} trimBam ${DEDUP_BAM} ${MASKED_BAM} -L ${LEFT_MASK} -R ${RIGHT_MASK}
+    fi 
+
+done
+
+
+#Prepare genotype calling
+MASKED_BAMS=($(find "out/4-trimBam/" -type f -name "*.masked.bam"))
+SAMPLE_NAMES=$(echo "${MASKED_BAMS[@]}" | grep -oE "MT[0-9]{1,2}|SK27300" | uniq | tr "\n" ","| sed 's/,$//')
+
+EIGEN_DIR="out/5-genotypes/Mentesh_eager_masked"
+
+mkdir -p $(dirname ${EIGEN_DIR})
+
+# Pileup and call Masked genomes
+if [ ! -f "${EIGEN_DIR}.ind" ]; then
+    samtools mpileup -BR -q${MIN_MQ} -Q${MIN_BQ} -f ${REFERENCE} -l <(awk '{print $2,$4}' ${TARGET_SNPS}) "${MASKED_BAMS[@]}" | \
+    pileupCaller --randomHaploid --snpFile "${TARGET_SNPS}" --sampleNames "${SAMPLE_NAMES}" --eigenstratOut "${EIGEN_DIR}" 
+    #             --plinkOut "${PLINK_DIR}"
+fi 
+
+# Pileup and call non-Masked genomes
+DEDUP_BAMS=($(find "out/2-dedup/" -type f -name "*_rmdup.bam"))
+SAMPLE_NAMES=$(echo "${DEDUP_BAMS[@]}" | grep -oE "MT[0-9]{1,2}|SK27300" | uniq | tr "\n" ","| sed 's/,$//')
+
+EIGEN_DIR="out/5-genotypes/Mentesh_eager_non-masked"
+PLINK_DIR="out/5-genotypes/Mentesh_eager_non-masked"
+
+if [ ! -f "${EIGEN_DIR}.ind" ]; then
+    samtools mpileup -BR -q${MIN_MQ} -Q${MIN_BQ} -f ${REFERENCE} -l <(awk '{print $2,$4}' ${TARGET_SNPS}) "${DEDUP_BAMS[@]}" | \
+    pileupCaller --randomHaploid --snpFile "${TARGET_SNPS}" --sampleNames "${SAMPLE_NAMES}" --eigenstratOut "${EIGEN_DIR}" 
+    #             --plinkOut "${PLINK_DIR}"
+fi 
+
+function filter(){
+    masked=$1
+    non_masked=$2
+    nuc_type=$3
+    out_base=$4
+    AWK_FILTER='(($5~/A|G/&&$6~/G|A/)||($5~/C|T/&&$6~/T|C/)){print NR}'
+    echo "extracting transitions from $masked and transversions from $non_masked"
+    transitions_positions=$(awk "${AWK_FILTER}" "${masked}.snp")
+    transversions_positions=$(awk '!'"${AWK_FILTER}" "${non_masked}.snp")
+
+    mkdir -p $(dirname $out_base)
+    echo "Found: $(echo "${transitions_positions[@]}" |wc -l) positions." 
+    positions=$(echo "${transitions_positions[@]}" |tr "\n" "," | sed "s/,$//")
+    #echo "${positions[@]}"
+    for ext in geno snp; do
+        echo -e "\tApplying filtering and merging on : ${masked}.${ext} and ${non_masked}.${ext}"
+        read -ra Rcmd <<- EOV
+        masked=read.table("${masked}.${ext}",header=F,sep=";", colClasses="character");non_masked=read.table("${non_masked}.${ext}", header=F, sep=";", colClasses="character");merged=non_masked;merged[c(${positions[@]}),] = masked[c(${positions[@]}),];write.table(merged,"${out_base}.${ext}",sep="\t", row.names=F, col.names=F,quote=F)
+EOV
+        #echo "${Rcmd[@]}" 
+        echo "${Rcmd[@]}" | Rscript -
+    done
+}
+
+# filter transition positions:
+
+# Print the line where transitions are found.
+
+# Only keep transitions from the masked file
+mkdir -p "out/6-filtered"
+filter "out/5-genotypes/Mentesh_eager_masked" "out/5-genotypes/Mentesh_eager_non-masked" "transitions" "out/6-filtered/Mentesh_eager_masked_transitions_only" "transitions"
+#filter "out/5-genotypes/Mentesh_eager_non-masked" "out/6-filtered/Mentesh_eager_non-masked_transversions_only" "transversions"
+
+
+## MERGE
+
+for ext in ind geno snp; do
+    cat out/6-filtered/Mentesh_eager_*. | sort -k2,2 -k2,4 > out/7-merged/Mentesh_eager_merged.${ext}
+done
+
+

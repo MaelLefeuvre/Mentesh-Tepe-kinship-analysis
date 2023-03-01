@@ -1,0 +1,13 @@
+#!/bin/bash
+
+STACK_HOME="`pwd`/dependencies/stack"
+SEQUENCETOOLS_HOME="`pwd`/dependencies/sequenceTools"
+
+# Install stack
+mkdir -p ${STACK_HOME}
+wget -qO- https://get.haskellstack.org/ | sh -s - -d ${STACK_HOME}
+
+# Install SequenceTools
+mkdir -p $SEQUENCETOOLS_HOME && cd $(dirname ${SEQUENCETOOLS_HOME})
+git clone https://github.com/stschiff/sequenceTools.git
+
