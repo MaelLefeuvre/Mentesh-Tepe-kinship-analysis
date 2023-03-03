@@ -1,4 +1,4 @@
-# 20220315 - Mentesh Tepe TKGWV2 analysis.
+# 20220824 - Mentesh Tepe TKGWV2 analysis.
 
 ## Summary
 **Date of analysis:** 2022-08-24
@@ -7,7 +7,7 @@
 ---
 
 ## Notes: 
-- This analysis uses a *fork* of the TKGWV2 repository, which can be found [here](git@github.com:MaelLefeuvre/tkgwv2.git). this version of the source code is in no way different from the original, but merely *adds* upon the initial repository, by providing with a command line interface for the helper scripts initially provided by Daniel. D. Fernandes.
+- This analysis uses a *fork* of the TKGWV2 repository, which can be found [here](https://github.com/MaelLefeuvre/tkgwv2.git). This version of the source code is in no way different from the original repository, but merely *adds* upon it, by providing with a command line interface for the *helper scripts* initially provided by Daniel. D. Fernandes.
 
 ## Usage
 ### 01. Setup the work environment

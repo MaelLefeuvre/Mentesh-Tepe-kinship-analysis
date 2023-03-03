@@ -1,7 +1,8 @@
-# 20220315 - Mentesh Tepe TKGWV2 analysis.
+20220315 - Mentesh Tepe READ analysis.
+---
 ## Summary
-**Date of analysis:** 2022-08-24.
-**Aim:** Run TKGWV2 Kinship analysis with MT-EAGER bam file.
+**Date of analysis:** 2022-03-15.
+**Aim:** Run READ Kinship analysis with MT-EAGER bam files WITHOUT running the manual PMD damage trimming and interlacing approach found in ([Skourtanioti et al.,2020](https://doi.org/10.1016/j.cell.2020.04.044)).
 
 ## Data 
 ###### Reference genome: 

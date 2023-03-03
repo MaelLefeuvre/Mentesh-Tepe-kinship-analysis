@@ -1,32 +1,31 @@
-# 20210723 - Mentesh Tepe EAGER preprocessing.
-
-## Summary:
-- **Date of analysis:** 2021-07-23  
-- **Aim:** Replicate the data preprocessing pipeline found within (Skourtanioti et al. 2020)'s paper, since we plan to compare MT23, MT26 and MT7 with  with MTT001 and ArslanTepe / Tell-Kurdu individuals.
-  - Latest release of EAGER-v1 is used. (Note that this software has not been maintained since Jan. 2018.)
-  - READ analysis is then performed using a two-pass methods see [README-READ-analysis.md](README-READ-analysis.md):
-    - 1. Perform Kinship analysis on a surrogate population (ART / KRD), and extract the median of meansP0
-    - 2. Perform Kinship analysis on Mentesh Tepe individuals using the previously obtained median(meansP0)
-
+20210723 - Mentesh Tepe EAGER preprocessing.
 ---
 
-## Pipeline description
-### Adapters:
+## Summary:
+**Date of analysis:** 2021-07-23  
+**Aim:** Replicate the data preprocessing pipeline found within (Skourtanioti et al. 2020)'s paper, since we plan to compare MT23, MT26 and MT7 with  with MTT001 and ArslanTepe / Tell-Kurdu individuals.
+- Latest release of EAGER-v1 is used. (Note that this software has not been maintained since Jan. 2018.)
+- READ analysis is then performed using a two-pass methods see [README-READ-analysis.md](README-READ-analysis.md):
+  1. Perform Kinship analysis on a surrogate population (ART / KRD), and extract the median of meansP0
+  2. Perform Kinship analysis on Mentesh Tepe individuals using the previously obtained median(meansP0)
+
+## Pipeline description.
+##### Adapters:
 
  - Adapter1: `GATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG`
  - Adapter2: `AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT`
 
-### EAGER preprocessing.
+### A. EAGER preprocessing.
 1. Sequencing adapters are clipped with `AdapterRemoval v2.2.0` and collapsed. fragments shorter than 30bp are discarded.
 2. Mapping is performed with `bwa v0.7.12`", using the `hs37d5` + applying a quality filtering of `q30`.
 3. PCR duplicates are removed using `dedup v0.12.` (this software considers the whole fragment composition to estimate potential PCR duplicates, whereas Picard will typically only match the beginning of the sequence, and leverage the sequence length to estimate duplication)
 4. PMD misincorporations is evaluated with `MapDamage v2.0.6`
 
-### Post-EAGER preprocessing
+### B. Post-EAGER preprocessing
 5. "Bam files are merged across libraries for the same individual"
 6. "PCR duplicate removal is performed on the merged files a second time, using `dedup v0.12`.
 
-### ***[LEGACY]*** Selective masking and interlacing of PMD misincorporations.
+### C. ***[LEGACY]*** Selective masking and interlacing of PMD misincorporations.
 **Important notice:** This section was ***not*** included in our final data processing protocol, but was merely an attempt to replicate the approaches found in (Skourtanioti et al. 2020). This approach does not fair well with non UDG-treated data, and the more sensible approach for our case was to simply apply 'standard' PMD-rescaling using MapDamage. 
 
 This section, and the corresponding scripts are thus only kept for archiving purposes. The rest of the analysis can be found in [README-READ-analysis.md](README-READ-analysis.md)
