@@ -7,7 +7,7 @@
 ---
 
 ## Notes: 
-- This analysis uses a *fork* of the TKGWV2 repository, which can be found [here](https://github.com/MaelLefeuvre/tkgwv2.git). This version of the source code is in no way different from the original repository, but merely *adds* upon it, by providing with a command line interface for the *helper scripts* initially provided by Daniel. D. Fernandes.
+- This analysis uses a *fork* of the TKGWV2 repository, which can be found [here](https://github.com/MaelLefeuvre/tkgwv2/tree/develop). This version of the source code is in no way different from the original repository, but merely *adds* upon it, by providing with a command line interface for the *helper scripts* initially provided by Daniel. D. Fernandes. More information regarding the changes and rationale behind this fork can be found on the corresponding [Pull Request](https://github.com/danimfernandes/tkgwv2/pull/5)
 
 ## Usage
 ### 01. Setup the work environment
