@@ -1,28 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-THREADS=`nproc`
+# ------------------------------------------------------------------------------------------------ #
+# 00-call-genotypes.                                                                               #
+# ------------------------------------------------------------------------------------------------ #
+# Description : Run MapDamage PMD rescaling on our samples, call genotypes using pileupCaller and  #
+#               convert the output eigenstrat format (snp|geno|ind) in plink format (ped|map|fam)  #
+# ------------------------------------------------------------------------------------------------ #
+# Dependencies: mapdamage-2.2.1 | sequencetools-1.5.2 | eigensoft-7.2.1                            #
+# ------------------------------------------------------------------------------------------------ #
+# Nodes       : - The script assumes you have an available conda v4.6+ in your path, and that the  #
+#                 environments mentionned above (see the 'envs' directoryà are preinstalled        #
+#                                                                                                  #
+#               - Variables for the location of the reference genome, target snp panek  and input  #
+#                 are hardset in code (See below).                                                 #
+# ------------------------------------------------------------------------------------------------ #
+# Usage       : ./src/00-call-genotypes                                                            #
+# ------------------------------------------------------------------------------------------------ #
 
-DATADIR="`pwd`/data"    # This is where fastq/bam and reference files should be located.
+# ---- Define path to the input and outputs.
 OUTPUTDIR="`pwd`/out"
+REFERENCE="data/reference/hs37d5/hs37d5.fa"
+TARGET_SNPS="data/target_positions/1240K/v44.3_1240K_public.snp"
 
-#RUNS=$(find data/out2/ | grep -Eo "202[0,1]_run[0-9]" | sort -u)
+# ---- Define input bam files.
 SAMPLES=$(find out/2-dedup/ | grep -Eo "MT[0-9]{1,2}|SK27300" | sort -u)
 
 
-REFERENCE="data/reference/hs37d5/hs37d5.fa"
-TARGET_SNPS="./data/target_positions/1240K/v44.3_1240K_public.snp"
-
-
+# ---- Samtools mpileup quality filtration parameters.
 MIN_MQ=30  # Min mapping quality: -q 
 MIN_BQ=30  # Min base    quality: -Q
 
-BAM_UTILS="`pwd`/dependencies/bamUtil/bam"
 
+# ---- Conda initialization. This lets us activate environments within this script.
+#      If your conda version is < v4.6, you'll have to replace this line with an
+#      explicit sourcing of the conda initialization script. On most user-installs
+#      this will be something in the likes of:
+#      '. $HOME/miniconda3/etc/profile.d/conda.sh'
+eval "$(conda shell.bash hook)"
 
-# Conda initialization
-source ~/miniconda3/etc/profile.d/conda.sh
-
-# Run mapDamage
+# ---- Performat PMD rescaling using MapDamage
 conda activate mapdamage-2.2.1
 for sample in ${SAMPLES}; do
 
@@ -41,7 +57,7 @@ done
 wait
 conda deactivate
 
-# Generate pileup file from rescaled bams with samtools
+# ---- Generate  apileup file from rescaled bams with samtools
 conda activate samtools-1.15
 OUTPUT_PILEUP="out/4-pileup/AllMT_RBq${MIN_MQ}Q${MIN_BQ}_1240k.mpileup"
 if [ ! -f ${OUTPUT_PILEUP} ]; then
@@ -61,8 +77,8 @@ if [ ! -f ${OUTPUT_PILEUP} ]; then
 fi 
 conda deactivate
 
+# ---- Random haploid Variant calling using pileupCaller
 conda activate sequencetools-1.5.2
-# Variant calling using pileupCaller
 OUTPUT_SNP="out/5-pileupCaller/AllMT_pileupCaller_RBq${MIN_MQ}Q${MIN_BQ}.snp"
 if [ ! -f ${OUTPUT_SNP} ]; then
     echo "Variant calling using PileupCaller"
@@ -78,7 +94,7 @@ fi
 conda deactivate
 
 
-# Convert to plink format.
+# ---- Convert to plink format using convertf.
 conda activate eigensoft-7.2.1
 OUTPUT_PED="${OUTPUT_SNP%.snp}.ped"
 if [ ! -f "${OUTPUT_PED}" ]; then

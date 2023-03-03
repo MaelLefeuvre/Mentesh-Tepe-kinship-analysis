@@ -1,12 +1,24 @@
-## 01. Setup the work environment
+# 20220315 - Mentesh Tepe TKGWV2 analysis.
+
+## Summary
+**Date of analysis:** 2022-08-24
+**Aim:** Apply pairwise kinship estimation using Fernandes DM's method [TKGWV2](https://github.com/danimfernandes/tkgwv2.git), and the provided 'EUR22M' SNP dataset. See the original publication [here](https://doi.org/10.1038/s41598-021-00581-3)
+
+---
+
+## Notes: 
+- This analysis uses a *fork* of the TKGWV2 repository, which can be found [here](git@github.com:MaelLefeuvre/tkgwv2.git). this version of the source code is in no way different from the original, but merely *adds* upon the initial repository, by providing with a command line interface for the helper scripts initially provided by Daniel. D. Fernandes.
+
+## Usage
+### 01. Setup the work environment
 ```Shell
 mamba env create -f envs/TKGWV2.yml
 mamba activate TKGWV2
 source envs/TKGWV2-post-deploy.sh
 ```
 ---
-## 02. Setup the input raw data
-### A. Symlink our preprocessed MT individuals
+### 02. Setup the input raw data
+#### A. Symlink our preprocessed MT individuals
 ```Shell
 mkdir 00-raw
 
@@ -16,7 +28,7 @@ ln -srt 00-raw ../../20220315-ART_MT-reanalysis/out/3-mapdamage/MT*/MT*.bam
 ln -srt 00-raw ../../20220315-ART_MT-reanalysis/out/3-mapdamage/MT*/MT*.bam.bai
 ```
 
-### B. Download and pre-process MTT001 bam files
+#### B. Download and pre-process MTT001 bam files
 **Study Accession**  : PRJEB37213
 **Citation**: 
 
@@ -54,7 +66,7 @@ mamba deactivate
 cd - 
 ```
 ---
-## 03. Run SNP downsampling, as per D.Fernandes recommandations...
+### 03. Run SNP downsampling, as per D.Fernandes recommandations...
 ```Shell
 mkdir -p 01-subsampled && cd 01-subsampled
 TK-helpers.py downsampleBam --downsampleN 1800000 && find . -type l -exec rm {} \;
@@ -62,7 +74,7 @@ cd -
 ```
 
 ---
-## 04. Run TKGWV2 on all 4 downsampled bam files.
+### 04. Run TKGWV2 on all 4 downsampled bam files.
 **Support Files URL:** https://drive.google.com/drive/folders/1Aw-0v_7CUorHJOLpCJ0QVCwEdH43HlO4
 
 ```shell
@@ -143,7 +155,7 @@ TKGWV2.py bam2plink --referenceGenome ${REFERENCE} \
 | MTT001  | MT26    |     31137 | 0.0418 |    4206 |   26931 | Unrelated    |
 | MTT001  | MT7     |     25330 | 0.0618 |    3453 |   21877 | Unrelated    |
 
-## 05. Run distSimulations
+### 05. Run distSimulations
 
 ```Shell
 TK-helpers.py distSimulations --sampleVec ./commMT*____MT*.frq --numSimPairs 6000
@@ -165,7 +177,7 @@ Running: /usr/bin/env Rscript --vanilla -e 'source("/home/mlefeuvre/miniconda3/e
 [1] "Generating simulated individuals based on allele frequencies from ./commMT7.fastq.combined.fq.prefixed.mapped.mappedonly.sorted.qF.sorted.cleaned.merged_rmdup.rescaled_subsampled____MTT001.1240K.merged.srt.rmdup_subsampled.frq"
 ```
 
-## 06 - Prettify Simulation figures
+### 06 - Prettify Simulation figures
 
 ```Bash
 # ---- Convert figures to png

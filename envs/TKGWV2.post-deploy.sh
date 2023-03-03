@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+eval "$(conda shell.bash hook)"
+conda activate TKGWV2
+
 # Project's fork
 TK_URL="https://github.com/MaelLefeuvre/tkgwv2/archive/refs/heads/develop.zip"
 
@@ -17,7 +20,3 @@ chmod +x tkgwv2-develop/helpers/*.R
 ln -s tkgwv2-develop/helpers/* .
 ln -s tkgwv2-develop/TKGWV2.py
 ln -s tkgwv2-develop/TK-helpers.py
-
-# Permanently add to path
-#conda develop `pwd`/tkgwv2-master/scripts
-#conda develop `pwd`/tkgwv2-master/helpers

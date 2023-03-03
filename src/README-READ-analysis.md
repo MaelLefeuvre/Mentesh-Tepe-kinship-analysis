@@ -1,26 +1,27 @@
-#### Summary
-**Date of analysis:** 2022-03-15  
-**Aim:** Re-run READ Kinship analysis with MT-EAGER bam files WITHOUT running manual PMD damage trimming and interlacing, as in ([Skourtanioti,2019](https://doi.org/10.1016/j.cell.2020.04.044)).
+# 20220315 - Mentesh Tepe TKGWV2 analysis.
+## Summary
+**Date of analysis:** 2022-08-24.
+**Aim:** Run TKGWV2 Kinship analysis with MT-EAGER bam file.
 
-#### Data 
+## Data 
 ###### Reference genome: 
  - hs37d5
  - From: `ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/phase2_reference_assembly_sequence`
 
-###### TARGET Positions and ancient genomes:
- - D.Reich '1240K Dataset', A.K.A allen-present-day-and-ancient-genotypes.
+###### Target Positions and ancient genomes:
+ - Reich' Lab 1240K compendium dataset
  - From: `https://reichdata.hms.harvard.edu/pub/datasets/amh_repo/curated_releases/V44/V44.3/SHARE/public.dir/v44.3_1240K_public.snp`
 
 
-#### Instructions:
-###### A. Dependencies
+## Instructions:
+### A. Dependencies
 1. Install miniconda3. See: [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 2. Create conda environments in ./envs
    ```Bash
    user@desktop:~$ for env in ./envs; do conda env create -f $env; done
    ```
 
-###### B. Prepare environment
+### B. Prepare environment
 1. Create symlink to the indexed hs37d5 ref. genome and 1240K target position (see [Data](#Data))
    ```Bash
    user@desktop:~$ mkdir -p ./data
@@ -32,12 +33,12 @@
 
 2. Create symlink to EAGER output.
    ```Bash
-   user@desktop:~$ mkdir -p ./out && ln -st ./out/ ../../MT_EAGER/out/2-dedup/
+   user@desktop:~$ mkdir -p ./out && ln -srt ./out/ ../../MT_EAGER/out/2-dedup/
    ```
    
-   - **Note:** These `.bam` files should be merged across runs + re-deduplicated
+   - **Note:** These `.bam` files should be merged across runs + re-deduplicated (see [README-EAGER.md](README-EAGER.md))
 
-###### C. Run `00-call-genotypes`
+### C. Run `00-call-genotypes`
 Calling `./src/00-call-genotypes` from the root directory will:
   1. Perform PMD rescaling using mapDamage
   2. Perform mpileup `-RB -q30 -Q30`
@@ -47,7 +48,7 @@ Calling `./src/00-call-genotypes` from the root directory will:
 **Expected output:** `out/5-pileupCaller/AllMT_pileupCaller_RBq30Q30.(ped/map/pedind)`
 
 
-###### D. Run `01-runREAD-1240K.sh`
+### D. Run `01-runREAD-1240K.sh`
 Calling `./src/01-runREAD-1240K.sh` from the root directory will:
   1. Install Software dependencies in `./methods` (plink-1.9, READ, eigensoft)
   2. Download `./v44.3_1240K_public.(snp|geno|ind)` dataset in `./data/Reich-dataset/`
@@ -59,7 +60,6 @@ Calling `./src/01-runREAD-1240K.sh` from the root directory will:
      - This will extract an medianP0 which we'll use as a reference for our Mentesh Tepe Individuals
   8. Extract Mentesh Tepe individuals from the merged dataset and run READ on them, using the previously calculated 'medianP0' from step 7.
   9. Merge the READ_results and meansP0_AncientDNA_normalized output of Step 7 and Step 8, for plotting.
-
 **Expected output:** `out/READ/MT_ART/READ_results`  and `out/READ/MT_ART/meansP0_AncientDNA_normalized`
 
 ###### E. Plot the results
@@ -68,6 +68,5 @@ Calling `./src/01-runREAD-1240K.sh` from the root directory will:
 user@desktop:~$ pushd results/MT_ART/
 user@desktop:~$ ../../src/plot_READ_results.R --regex "MT.*MT.*" --mainName "Mentesh Tepe" --proxyName "Arslan Tepe"
 ```
-
 **Expected output:** `READ_plot.html` and `READ_lib_plot`
 

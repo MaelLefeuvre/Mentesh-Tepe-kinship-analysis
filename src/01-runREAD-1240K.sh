@@ -1,14 +1,35 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ------------------------------------------------------------------------------------------------ #
+# 01-runREAD-1240K.sh                                                                              #
+# ------------------------------------------------------------------------------------------------ #
+# Description : Merges our fileset with the Reich 1240K compendium dataset, performs maf filering  #
+#               and the re-extracts our samples, along with a set of 'proxy individuals' to run a  #
+#               kinship analysis using READ.                                                       # 
+#               Proxy individuals are used to compute the normalization value of READ and thus act #
+#               as a 'surrogate population' for our Mentesh Tepe individuals.                      #
+#               Note that the normalization value, and the **actual** kinship estimation of our    #
+#               samples are done separately, in order to mitigate the risk of introducing biases   #
+# ------------------------------------------------------------------------------------------------ #
+# Dependencies: - Software:  READ | python2.7 (for READ) | plink-1.9 | eigensoft                   #
+#               - Libraries: libgsl-dev libopenblas-dev liblapack-dev liblapacke-dev               #
+# ------------------------------------------------------------------------------------------------ #
+# Nodes       : - The script assumes you have an available conda v4.6+ in your path, and that the  #
+#                 environments mentionned above (see the 'envs' directoryà are preinstalled        #
+# 
+#               - These dependencies will be installed in the './methods' directory and assumes    #
+#                 you're working on a x86_64 architecture                                          #
+# ------------------------------------------------------------------------------------------------ #
+# Usage       : ./src/01-runREAD-1240K.sh                                                          #
+# ------------------------------------------------------------------------------------------------ #
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # ------------------------------------------------- PARAMETERS ------------------------------------------------------- #
 
-#MT_DATA="/mnt/data/mlefeuvr/MT_final/original_data/1240v2_NP_MDHm2021_1_1240k-only"
-#MT_DATA="../../../MT_EAGER/out/6-filtered/Mentesh_eager_masked_transitions_only"
 MT_DATA="out/5-pileupCaller/AllMT_pileupCaller_RBq30Q30"
 REICH_DATA="data/target_positions/Reich-dataset/v44.3_1240K_public"
 
-REGEX="KRD" # KRD / ART
+REGEX="ART" # KRD / ART
 MAF=0.05
 
 PREPROCESS_DIR="./out/6-preprocess"
@@ -31,7 +52,7 @@ function log(){
     #                               WARN  - not fatal, but user should still get notified...
     #                               FATAL - Something went very wrong and should get fixed...
     local level message
-    read -r level message <<< $(echo $1 $2) 
+    read -r level message <<< $(echo $1 $2)
     local reset='\e[97m'
     declare -A levels=([INFO]="\e[32m" [WARN]="\e[33m" [FATAL]="\e[31m")
     local color=${levels["${level}"]}    
@@ -75,7 +96,7 @@ function make_keep_file(){
 }
 
 function prime_READ(){
-    # READ is not even capable of handling remote execution or I/O management...
+    # READ is unable to handle remote execution or I/O management...
     # We have to manually create the meansP0_AncientDNA_normalized file
     # and instantiate a symbolink link to READscript.R
     ln -sf ${READ_HOME}/READscript.R
@@ -87,7 +108,7 @@ function prime_READ(){
 header "SETTING DEPENDENCIES" 
 
 
-# Download READ
+# ---- Download READ
 if [ ! -f "${READ_HOME}/READ.py" ]; then
     log INFO "Installing read in ${READ_HOME}"  
     mkdir -p ${READ_HOME} && pushd ${READ_HOME}
@@ -98,7 +119,7 @@ else
     log INFO "Using READ in ${READ_HOME}"
 fi
 
-# Download PLINK1.9
+# ---- Download PLINK1.9
 if [ ! -d ${PLINK_HOME} ]; then 
     log INFO "Installing Plink1.9 in ${PLINK_HOME}"
     mkdir -p ${PLINK_HOME} && pushd ${PLINK_HOME} > /dev/null
@@ -117,9 +138,7 @@ fi
 if [ ! -x "${EIGENSOFT_HOME}/bin/convertf" ]; then
     # Check for and ask to install dependencies.
     log INFO "Installing eigensoft in ${EIGENSOFT_HOME}"
-    #log WARN "'sudo apt-get install gfortran liblapack-dev' may be required."
     log WARN "'sudo apt-get install libgsl-dev libopenblas-dev liblapack-dev liblapacke-dev' may be required "
-    #EIGENSOFT_REPO="https://github.com/argriffing/eigensoft.git"
     EIGENSOFT_REPO="https://github.com/DReichLab/EIG.git"
     mkdir -p ${EIGENSOFT_HOME} && pushd ${EIGENSOFT_HOME}
     git clone $EIGENSOFT_REPO .
@@ -189,7 +208,6 @@ MT_ONLY_DATA="${PREPROCESS_DIR}/${FILE_HEADER}.1240K_maf_MT_only"
 if [ ! -f "${MT_ONLY_DATA}.bed" ]; then
     log INFO "STEP I - Extracting MT_individuals from ${MT_DATA}"
     keep_file="./in/keep_MT_only.txt"
-    #cat "${MT_DATA}.pedind" | grep "MT[0-9]{1,2}" | cut -f1,2 -d" " > ${keep_file} 
     make_keep_file ${MT_DATA} "MT[0-9]{1,2}" "${keep_file}"
     log INFO "Running Plink..."
     ${PLINK_HOME}/plink --threads ${PROCS} --file ${MT_DATA} --keep "${keep_file}" --out ${MT_ONLY_DATA} --make-bed --allow-no-sex || abort
@@ -219,7 +237,6 @@ ART_MT_DATA="${PREPROCESS_DIR}/${FILE_HEADER}.v44.3_1240k_public_MT_merged_maf_$
 if [ ! -f "${ART_MT_DATA}.bed" ]; then
     log INFO "STEP IV - Extract ${REGEX} and MT individuals."
     keep_file="./in/v44.3_keep_inds.txt"
-    #cat "${MT_MAF_DATA}.fam" | grep -E "M[T]{1,2}[0-9]|${REGEX}" | grep -v "ART024" |cut -f1,2 -d " " > ${keep_file}
     make_keep_file ${MT_MAF_DATA} "M[T]{1,2}[0-9]|${REGEX}" "${keep_file}"
     ${PLINK_HOME}/plink --threads ${PROCS} --bfile ${MT_MAF_DATA} --keep ${keep_file} --make-bed --chr 1-22 --out "${ART_MT_DATA}" || abort
 else
@@ -230,7 +247,6 @@ ART_ONLY_DATA="out/READ/${REGEX}/${FILE_HEADER}.v44.3_1240k_public_MT_merged_maf
 if [ ! -f "${ART_ONLY_DATA}.tped" ]; then
     log INFO "STEP V - Extract $REGEX{} and transpose to tped/tfam"
     keep_file="./in/v44.3_keep_${REGEX}_only.txt"
-    #cat "${ART_MT_DATA}.fam" | grep "${REGEX}" | cut -f1,2 -d" " > ${keep_file}
     make_keep_file ${ART_MT_DATA} "${REGEX}" "${keep_file}"
     mkdir -p "./out/READ/${REGEX}"
     ${PLINK_HOME}/plink --threads ${PROCS} -bfile ${ART_MT_DATA} --keep ${keep_file} --recode transpose --out ${ART_ONLY_DATA} || abort
@@ -242,7 +258,6 @@ MT_ONLY_DATA="out/READ/MT/${FILE_HEADER}.v44.3_1240k_public_MT_merged_maf_${MAF#
 if [ ! -f "${MT_ONLY_DATA}.tped" ]; then
     log INFO "STEP VI - Extract MT and transpose to tped/tfam"
     keep_file="./in/v44.3_keep_MT_only.txt"
-    #cat "${ART_MT_DATA}.fam" | grep "MT" | cut -f1,2 -d" " > ${keep_file}
     make_keep_file ${ART_MT_DATA} "MT" "${keep_file}"
     mkdir -p "./out/READ/MT"
     ${PLINK_HOME}/plink --threads ${PROCS} -bfile ${ART_MT_DATA} --keep ${keep_file} --recode transpose --out ${MT_ONLY_DATA} || abort
@@ -262,7 +277,7 @@ prime_READ;
 /usr/bin/python2 ${READ_HOME}/READ.py $(basename ${ART_ONLY_DATA}) median - || abort
 popd
  
-# GET MEDIAN P0 value
+# ---- GET MEDIAN P0 value from our proxy individuals.
 MEDIAN_P0=$(Rscript ./src/get_median_P0.R "$(dirname ${ART_ONLY_DATA})/meansP0_AncientDNA_normalized")
 log WARN "Median P0 for ${REGEX}: ${MEDIAN_P0}"
 
@@ -274,7 +289,7 @@ ${PYTHON} ${READ_HOME}/READ.py $(basename ${MT_ONLY_DATA}) value "${MEDIAN_P0}" 
 popd 
 
 
-# Merge 
+# --- Merge READ results.
 log INFO "STEP IX - Merge ${ART_ONLY_DATA} and ${MT_ONLY_DATA} results for plotting."
 MERGED_P0="results/MT_${REGEX}/meansP0_AncientDNA_normalized"
 mkdir -p $(dirname ${MERGED_P0})
