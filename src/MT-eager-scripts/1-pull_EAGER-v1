@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# From: https://eager.readthedocs.io/en/latest/contents/installation.html#singularity
+singularity pull shub://apeltzer/EAGER-GUI

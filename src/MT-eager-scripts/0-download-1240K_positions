@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# FROM: https://reich.hms.harvard.edu/allen-ancient-dna-resource-aadr-downloadable-genotypes-present-day-and-ancient-dna-data
+
+POS_DIR="./data/target_positions/1240K"
+mkdir -p ${POS_DIR} && cd ${POS_DIR}
+URL="https://reichdata.hms.harvard.edu/pub/datasets/amh_repo/curated_releases/V44/V44.3/SHARE/public.dir/v44.3_1240K_public.snp"
+wget ${URL}

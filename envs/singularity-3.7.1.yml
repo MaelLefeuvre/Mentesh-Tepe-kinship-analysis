@@ -1,0 +1,5 @@
+name: singularity-3.7.1
+channels:
+  - conda-forge
+dependencies:
+  - conda-forge::singularity=3.7.1

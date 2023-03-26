@@ -1,0 +1,23 @@
+#!/bin/bash
+
+
+
+function install_bamutils(){
+    version=$1
+    prefix=$2
+    build_dir=$3
+
+
+    bamutil_repo="https://github.com/statgen/bamUtil"    
+    cd ${build_dir}
+    git clone ${bamutil_repo} "./bamUtil"
+    cd "./bamUtil"
+    git checkout ${version}
+    make cloneLib && make && make install INSTALLDIR=${prefix}
+}
+
+
+INSTALL_DIR="`pwd`/dependencies/bamUtil"
+VERSION="v1.0.15"
+BUILD_DIR="/tmp"
+install_bamutils "${VERSION}" "${INSTALL_DIR}" "${BUILD_DIR}"

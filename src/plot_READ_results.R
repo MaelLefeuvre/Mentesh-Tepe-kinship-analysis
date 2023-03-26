@@ -36,7 +36,9 @@ parse_arguments= function(){
 			help='[Required] (String): regular expression used to find the main individual pairs of interest. [Example]: "MT.*MT.*" will match any pair of individuals both belonging to the MT population. (e.g. : "MT23MT26", "MT8MT32")')
     parser$add_argument('--mainName', type='character', default="Main", help='[Optional] (String): Full name of the population of interest. Merely for plotting purposes.')
     parser$add_argument('--proxyName', type='character', default="Proxy", help='[Optional] (String): Full name of the surrogate, or "proxy" population. Merely for plotting purposes.')
-    
+
+    parser$add_argument('--format', type='character', default='png', help='[Optional] (String) Output file format ("png", "svg").')
+
     parser$add_argument('--h', type='logical', action='store_true', help='Print this help message.')
     parser$add_argument('--help', type='logical', action='store_true', help='Print this help message.')
  
@@ -73,7 +75,7 @@ main = function(){
   main_pairs    = grepl(optargs$regex, meansP0$PairIndividuals)
   out = tryCatch(
     expr = {
-      error(length(main_pairs==0))
+      !any(main_pairs)
     },
     error = function(cond){
       message(paste0("Error: Provided regex pattern: '",optargs$regex,"' failed to catch any pair of individuals."))
@@ -144,7 +146,7 @@ main = function(){
                                  xref      = "paper",
                                  text      = sprintf("<b>%s</b>", kinships),
                                  showarrow = FALSE,
-                                 font      = list(size=14)
+                                 font      = list(size=20)
                                 )
   
   fig <- fig %>% add_annotations(x         = 1,
@@ -154,9 +156,8 @@ main = function(){
                                  xanchor   = "right",
                                  xref      = "paper",
                                  text      = "<b>Unrelated</b>",
-                                 size      = 14,
-                                 showarrow = FALSE,
-                                 font      = list(size=16)
+                                 font      = list(size=20),
+                                 showarrow = FALSE
                                 )
   
   
@@ -169,7 +170,8 @@ main = function(){
                                  yanchor   = 'top',
                                  xanchor   = 'left',
                                  text      = paste0("<b>",pretty_labels, "</b>"),
-                                 showarrow = FALSE
+                                 showarrow = FALSE,
+				 font      = list(size=16)
                                 )
   
   # Add annotations and format legend.
@@ -182,12 +184,13 @@ main = function(){
                               yref        = 'paper',
                               xanchor     = 'left',
                               yanchor     = 'top',
-                              font        = list(size=12)
+                              font        = list(size=18)
                              ),
                 xaxis  = list(showticklabels=F),
-                yaxis  = list(title     = "<b> Normalized mean P̄0</b>",
+                yaxis  = list(title     = list(text="<b> Normalized mean P̄0</b>", font=list(size=18)),
+			      font      = list(size=18),
                               titlefont = list(size=15),
-                              tickfont  = list(size=14),
+                              tickfont  = list(size=16),
                               range     = c(0.5, max(meansP0$Normalized2AlleleDifference+meansP0$StandardError*2)+0.01)
                              ),
                 margin = list(l = 5,
@@ -195,7 +198,16 @@ main = function(){
                               t = 0,
                               b = 0
                              )
-               )
+               ) %>%
+    plotly::config(
+      editable    = TRUE,
+      displaylogo = FALSE,
+      scrollZoom  = TRUE,
+      toImageButtonOptions = list(
+        format = optargs$format,
+        filename = paste0("READ-boxplot")
+      )
+    )
   
   
   saveWidget(fig, "READ_plot.html", selfcontained=F, libdir="READ_lib_plot")
